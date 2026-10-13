@@ -71,5 +71,27 @@ class TestAtlasScript(unittest.TestCase):
             run_atlas("print(10 / 0);")
 
 
+    def test_functions(self):
+        result = run_atlas("""
+            fn add(a, b) {
+                return a + b;
+            }
+            print(add(10, 20));
+        """)
+        self.assertEqual(result, "30")
+
+    def test_recursion(self):
+        result = run_atlas("""
+            fn factorial(n) {
+                if (n <= 1) {
+                    return 1;
+                }
+                return n * factorial(n - 1);
+            }
+            print(factorial(5));
+        """)
+        self.assertEqual(result, "120")
+
+
 if __name__ == "__main__":
     unittest.main()
