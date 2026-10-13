@@ -1,0 +1,6 @@
+
+let a = (8 + 2) * 3;
+let b = a / 2;
+
+print(a);
+print(b);
