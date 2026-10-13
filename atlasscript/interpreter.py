@@ -1,12 +1,12 @@
 
 from atlasscript.parser import (
-    Number, String, Variable, Binary, Let, Print
+    Number, String, Variable, Binary,
+    Let, Assign, Print, If, While
 )
 
 
 class Interpreter:
     def __init__(self):
-        # Stores AtlasScript variables.
         self.variables = {}
 
     def evaluate(self, node):
@@ -29,19 +29,29 @@ class Interpreter:
 
             if node.operator == "+":
                 return left + right
-
             if node.operator == "-":
                 return left - right
-
             if node.operator == "*":
                 return left * right
-
             if node.operator == "/":
                 if right == 0:
                     raise ZeroDivisionError(
                         "Cannot divide by zero"
                     )
                 return left / right
+
+            if node.operator == "==":
+                return left == right
+            if node.operator == "!=":
+                return left != right
+            if node.operator == "<":
+                return left < right
+            if node.operator == ">":
+                return left > right
+            if node.operator == "<=":
+                return left <= right
+            if node.operator == ">=":
+                return left >= right
 
             raise RuntimeError(
                 f"Unknown operator: {node.operator}"
@@ -53,13 +63,37 @@ class Interpreter:
 
     def execute(self, statement):
         if isinstance(statement, Let):
-            value = self.evaluate(statement.value)
-            self.variables[statement.name] = value
+            self.variables[statement.name] = self.evaluate(
+                statement.value
+            )
+            return
+
+        if isinstance(statement, Assign):
+            if statement.name not in self.variables:
+                raise NameError(
+                    f"Undefined variable: {statement.name}"
+                )
+            self.variables[statement.name] = self.evaluate(
+                statement.value
+            )
             return
 
         if isinstance(statement, Print):
-            value = self.evaluate(statement.value)
-            print(value)
+            print(self.evaluate(statement.value))
+            return
+
+        if isinstance(statement, If):
+            body = (
+                statement.then_body
+                if self.evaluate(statement.condition)
+                else statement.else_body
+            )
+            self.run(body)
+            return
+
+        if isinstance(statement, While):
+            while self.evaluate(statement.condition):
+                self.run(statement.body)
             return
 
         raise RuntimeError(

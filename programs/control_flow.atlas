@@ -1,0 +1,13 @@
+
+let counter = 0;
+
+while (counter < 5) {
+    print(counter);
+    counter = counter + 1;
+}
+
+if (counter == 5) {
+    print("Mission complete!");
+} else {
+    print("Something went wrong!");
+}
