@@ -1,13 +1,22 @@
 
 from atlasscript.parser import (
     Number, String, Variable, Binary,
-    Let, Assign, Print, If, While
+    Let, Assign, Print, If, While,
+    Function, Call, Return
 )
+
+
+class ReturnSignal(Exception):
+    def __init__(self, value):
+        self.value = value
 
 
 class Interpreter:
     def __init__(self):
         self.variables = {}
+        self.functions = {}
+        self.call_stack = []
+        self.max_call_depth = 100
 
     def evaluate(self, node):
         if isinstance(node, Number):
@@ -57,6 +66,49 @@ class Interpreter:
                 f"Unknown operator: {node.operator}"
             )
 
+        if isinstance(node, Call):
+            if node.name not in self.functions:
+                raise NameError(
+                    f"Undefined function: {node.name}"
+                )
+
+            function = self.functions[node.name]
+
+            if len(node.args) != len(function.params):
+                raise TypeError(
+                    f"{node.name} expects "
+                    f"{len(function.params)} arguments, "
+                    f"got {len(node.args)}"
+                )
+
+            args = [
+                self.evaluate(arg)
+                for arg in node.args
+            ]
+
+            if len(self.call_stack) >= self.max_call_depth:
+                raise RuntimeError(
+                    "Maximum call depth exceeded"
+                )
+
+            previous_variables = self.variables
+            local_variables = dict(
+                zip(function.params, args)
+            )
+
+            self.call_stack.append(node.name)
+            self.variables = local_variables
+
+            try:
+                self.run(function.body)
+            except ReturnSignal as signal:
+                return signal.value
+            finally:
+                self.variables = previous_variables
+                self.call_stack.pop()
+
+            return None
+
         raise RuntimeError(
             f"Unknown expression: {node}"
         )
@@ -73,6 +125,7 @@ class Interpreter:
                 raise NameError(
                     f"Undefined variable: {statement.name}"
                 )
+
             self.variables[statement.name] = self.evaluate(
                 statement.value
             )
@@ -95,6 +148,20 @@ class Interpreter:
             while self.evaluate(statement.condition):
                 self.run(statement.body)
             return
+
+        if isinstance(statement, Function):
+            self.functions[statement.name] = statement
+            return
+
+        if isinstance(statement, Return):
+            if not self.call_stack:
+                raise RuntimeError(
+                    "return outside a function"
+                )
+
+            raise ReturnSignal(
+                self.evaluate(statement.value)
+            )
 
         raise RuntimeError(
             f"Unknown statement: {statement}"

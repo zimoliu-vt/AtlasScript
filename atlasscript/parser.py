@@ -57,6 +57,24 @@ class While:
     body: list
 
 
+@dataclass
+class Function:
+    name: str
+    params: list
+    body: list
+
+
+@dataclass
+class Call:
+    name: str
+    args: list
+
+
+@dataclass
+class Return:
+    value: object
+
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -99,6 +117,48 @@ class Parser:
         return statements
 
     def statement(self):
+
+        
+        if self.match("fn"):
+            name = self.current()
+
+            if name.kind != "IDENTIFIER":
+                raise SyntaxError("Expected function name")
+
+            self.pos += 1
+            self.expect("(")
+
+            params = []
+
+            if self.current().value != ")":
+                while True:
+                    param = self.current()
+
+                    if param.kind != "IDENTIFIER":
+                        raise SyntaxError(
+                            "Expected parameter name"
+                        )
+
+                    params.append(param.value)
+                    self.pos += 1
+
+                    if not self.match(","):
+                        break
+
+            self.expect(")")
+            body = self.block()
+
+            if len(params) != len(set(params)):
+                raise SyntaxError("Duplicate parameter name")
+
+            return Function(name.value, params, body)
+
+        if self.match("return"):
+            value = self.expression()
+            self.expect(";")
+            return Return(value)
+
+
         if self.match("let"):
             name = self.current()
             if name.kind != "IDENTIFIER":
@@ -203,9 +263,25 @@ class Parser:
             self.pos += 1
             return String(token.value)
 
+        
         if token.kind == "IDENTIFIER":
             self.pos += 1
+
+            if self.match("("):
+                args = []
+
+                if self.current().value != ")":
+                    while True:
+                        args.append(self.expression())
+
+                        if not self.match(","):
+                            break
+
+                self.expect(")")
+                return Call(token.value, args)
+
             return Variable(token.value)
+
 
         if self.match("("):
             node = self.expression()
