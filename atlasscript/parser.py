@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from atlasscript.lexer import tokenize
 
 
+# AST node definitions
+
 @dataclass
 class Number:
     value: int
@@ -32,8 +34,27 @@ class Let:
 
 
 @dataclass
+class Assign:
+    name: str
+    value: object
+
+
+@dataclass
 class Print:
     value: object
+
+
+@dataclass
+class If:
+    condition: object
+    then_body: list
+    else_body: list
+
+
+@dataclass
+class While:
+    condition: object
+    body: list
 
 
 class Parser:
@@ -65,10 +86,21 @@ class Parser:
 
         return statements
 
+    def block(self):
+        self.expect("{")
+        statements = []
+
+        while self.current().value != "}":
+            if self.current().kind == "EOF":
+                raise SyntaxError("Unterminated block")
+            statements.append(self.statement())
+
+        self.expect("}")
+        return statements
+
     def statement(self):
         if self.match("let"):
             name = self.current()
-
             if name.kind != "IDENTIFIER":
                 raise SyntaxError("Expected variable name")
 
@@ -76,7 +108,6 @@ class Parser:
             self.expect("=")
             value = self.expression()
             self.expect(";")
-
             return Let(name.value, value)
 
         if self.match("print"):
@@ -84,8 +115,34 @@ class Parser:
             value = self.expression()
             self.expect(")")
             self.expect(";")
-
             return Print(value)
+
+        if self.match("if"):
+            self.expect("(")
+            condition = self.expression()
+            self.expect(")")
+            then_body = self.block()
+
+            else_body = []
+            if self.match("else"):
+                else_body = self.block()
+
+            return If(condition, then_body, else_body)
+
+        if self.match("while"):
+            self.expect("(")
+            condition = self.expression()
+            self.expect(")")
+            body = self.block()
+            return While(condition, body)
+
+        if self.current().kind == "IDENTIFIER":
+            name = self.current().value
+            self.pos += 1
+            self.expect("=")
+            value = self.expression()
+            self.expect(";")
+            return Assign(name, value)
 
         raise SyntaxError(
             f"Unexpected statement at "
@@ -93,9 +150,22 @@ class Parser:
         )
 
     def expression(self):
+        return self.equality()
+
+    def equality(self):
+        node = self.comparison()
+
+        while self.current().value in ("==", "!="):
+            op = self.current().value
+            self.pos += 1
+            node = Binary(node, op, self.comparison())
+
+        return node
+
+    def comparison(self):
         node = self.term()
 
-        while self.current().value in ("+", "-"):
+        while self.current().value in ("<", ">", "<=", ">="):
             op = self.current().value
             self.pos += 1
             node = Binary(node, op, self.term())
@@ -105,7 +175,7 @@ class Parser:
     def term(self):
         node = self.factor()
 
-        while self.current().value in ("*", "/"):
+        while self.current().value in ("+", "-"):
             op = self.current().value
             self.pos += 1
             node = Binary(node, op, self.factor())
@@ -113,6 +183,16 @@ class Parser:
         return node
 
     def factor(self):
+        node = self.primary()
+
+        while self.current().value in ("*", "/"):
+            op = self.current().value
+            self.pos += 1
+            node = Binary(node, op, self.primary())
+
+        return node
+
+    def primary(self):
         token = self.current()
 
         if token.kind == "NUMBER":
